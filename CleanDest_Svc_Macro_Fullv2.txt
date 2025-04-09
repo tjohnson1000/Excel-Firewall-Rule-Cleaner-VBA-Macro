@@ -1,3 +1,5 @@
+'Perplexity Version
+
 Function CleanDestinationField(rawText As String) As String
     Dim parts() As String
     Dim result As String
