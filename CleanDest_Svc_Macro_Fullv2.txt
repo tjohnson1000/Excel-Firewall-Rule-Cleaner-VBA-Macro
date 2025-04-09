@@ -1,0 +1,93 @@
+Function CleanDestinationField(rawText As String) As String
+    Dim parts() As String
+    Dim result As String
+    Dim i As Integer
+    Dim item As String
+    Dim ipRegex As Object
+    Dim fqdnRegex As Object
+
+    ' Initialize regex objects for IPs and FQDNs
+    Set ipRegex = CreateObject("VBScript.RegExp")
+    Set fqdnRegex = CreateObject("VBScript.RegExp")
+
+    ipRegex.Pattern = "\b(?:\d{1,3}\.){3}\d{1,3}\b" ' Matches valid IPv4 addresses
+    ipRegex.Global = True
+
+    fqdnRegex.Pattern = "\b[a-zA-Z0-9-]+\.(com|net)\b" ' Matches FQDNs ending in .com or .net
+    fqdnRegex.Global = True
+
+    ' Replace semicolons and spaces with commas for consistent splitting
+    rawText = Replace(Replace(rawText, ";", ","), " ", ",")
+    parts = Split(rawText, ",")
+
+    ' Iterate through each part and validate against regex patterns
+    For i = LBound(parts) To UBound(parts)
+        item = Trim(parts(i))
+        If ipRegex.Test(item) Or fqdnRegex.Test(item) Then
+            If result <> "" Then result = result & ", "
+            result = result & item
+        End If
+    Next i
+
+    CleanDestinationField = result
+End Function
+
+Function CleanServiceField(rawText As String) As String
+    Dim parts() As String
+    Dim result As String
+    Dim i As Integer
+    Dim item As String
+    Dim svcRegex As Object
+
+    ' Initialize regex object for service patterns (e.g., tcp-80)
+    Set svcRegex = CreateObject("VBScript.RegExp")
+    svcRegex.Pattern = "^(tcp|udp)-\d+$" ' Matches valid service formats like tcp-80 or udp-443
+    svcRegex.IgnoreCase = True
+
+    ' Replace semicolons and spaces with commas for consistent splitting
+    rawText = Replace(Replace(rawText, ";", ","), " ", ",")
+    parts = Split(rawText, ",")
+
+    ' Iterate through each part and validate against regex pattern
+    For i = LBound(parts) To UBound(parts)
+        item = Trim(parts(i))
+        If svcRegex.Test(item) Then
+            If result <> "" Then result = result & ", "
+            result = result & LCase(item) ' Convert to lowercase for consistency
+        End If
+    Next i
+
+    CleanServiceField = result
+End Function
+
+Sub CleanFirewallColumns()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim rawDest As String
+    Dim rawSvc As String
+    Dim cleanedDest As String
+    Dim cleanedSvc As String
+
+    ' Set the worksheet (adjust if needed)
+    Set ws = ThisWorkbook.Sheets(1)
+    
+    ' Determine the last row based on the Destination column (Column B)
+    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+
+    ' Loop through rows starting from row 2 (assuming headers in row 1)
+    For i = 2 To lastRow 
+        rawDest = ws.Cells(i, "B").Value ' Destination column (Column B)
+        rawSvc = ws.Cells(i, "D").Value  ' Services column (Column D)
+
+        ' Clean the Destination and Service fields using respective functions
+        cleanedDest = CleanDestinationField(rawDest)
+        cleanedSvc = CleanServiceField(rawSvc)
+
+        ' Update the worksheet with cleaned values
+        ws.Cells(i, "B").Value = cleanedDest
+        ws.Cells(i, "D").Value = cleanedSvc
+    Next i
+
+    MsgBox "Destination and Services columns cleaned successfully!", vbInformation
+End Sub
