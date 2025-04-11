@@ -1,0 +1,93 @@
+Function CleanDestinationField(rawText As String) As String
+    Dim parts() As String, result As String
+    Dim i As Integer, item As String
+    Dim ipRegex As Object, fqdnRegex As Object
+
+    Set ipRegex = CreateObject("VBScript.RegExp")
+    Set fqdnRegex = CreateObject("VBScript.RegExp")
+
+    ipRegex.Pattern = "\b(?:\d{1,3}\.){3}\d{1,3}\b"
+    fqdnRegex.Pattern = "\b[a-zA-Z0-9-]+\.(com|net)\b"
+
+    parts = Split(Replace(Replace(rawText, ";", ","), " ", ","), ",")
+
+    For i = LBound(parts) To UBound(parts)
+        item = Trim(parts(i))
+        If ipRegex.Test(item) Or fqdnRegex.Test(item) Then
+            If result <> "" Then result = result & ", "
+            result = result & item
+        End If
+    Next i
+
+    CleanDestinationField = result
+End Function
+
+Function CleanServiceField(rawText As String) As String
+    Dim parts() As String, result As String
+    Dim i As Integer, item As String
+    Dim svcRegex As Object
+
+    Set svcRegex = CreateObject("VBScript.RegExp")
+    svcRegex.Pattern = "^(tcp|udp)-\d+$"
+    svcRegex.IgnoreCase = True
+
+    rawText = Replace(Replace(rawText, ";", ","), " ", ",")
+    parts = Split(rawText, ",")
+
+    For i = LBound(parts) To UBound(parts)
+        item = Trim(parts(i))
+        If svcRegex.Test(item) Then
+            If result <> "" Then result = result & ", "
+            result = result & LCase(item)
+        End If
+    Next i
+
+    CleanServiceField = result
+End Function
+
+Sub CleanFirewallColumns()
+    Dim ws As Worksheet, backupWs As Worksheet, logWs As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim rawDest As String, rawSvc As String
+    Dim cleanedDest As String, cleanedSvc As String
+    Dim timestamp As String
+
+    Set ws = ThisWorkbook.Sheets(1) ' Change this to your specific sheet name if needed
+    lastRow = ws.Cells(ws.Rows.Count, "C").End(xlUp).Row
+
+    timestamp = Format(Now, "yyyymmdd_HHmmss")
+
+    ' --- Create Backup ---
+    ws.Copy After:=Sheets(Sheets.Count)
+    Set backupWs = ActiveSheet
+    backupWs.Name = "Backup_Original_" & timestamp
+
+    ' --- Create Log Sheet ---
+    Set logWs = Sheets.Add(After:=Sheets(Sheets.Count))
+    logWs.Name = "Clean_Log_" & timestamp
+    logWs.Range("A1:F1").Value = Array("Row", "Orig Destination", "Cleaned Destination", "Orig Service", "Cleaned Service", "Status")
+
+    ' --- Process Rows ---
+    For i = 2 To lastRow ' assuming headers are in row 1
+        rawDest = ws.Cells(i, "C").Value
+        rawSvc = ws.Cells(i, "D").Value
+
+        cleanedDest = CleanDestinationField(rawDest)
+        cleanedSvc = CleanServiceField(rawSvc)
+
+        ws.Cells(i, "C").Value = cleanedDest
+        ws.Cells(i, "D").Value = cleanedSvc
+
+        ' Log the change
+        With logWs
+            .Cells(i, "A").Value = i
+            .Cells(i, "B").Value = rawDest
+            .Cells(i, "C").Value = cleanedDest
+            .Cells(i, "D").Value = rawSvc
+            .Cells(i, "E").Value = cleanedSvc
+            .Cells(i, "F").Value = "Cleaned"
+        End With
+    Next i
+
+    MsgBox "✅ Columns cleaned, backup created, and log recorded.", vbInformation
+End Sub
